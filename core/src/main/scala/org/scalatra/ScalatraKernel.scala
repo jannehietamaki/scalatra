@@ -114,8 +114,9 @@ trait ScalatraKernel extends Handler with CoreDsl with Initializable
           errorHandler,
           doNotFound,
           renderResponse _,
-          renderHaltException _,
-          _multiParams)
+          renderHaltException _) {
+      protected def withMultiParams[S](v: Map[String, Seq[String]])(thunk: => S): S = _multiParams.withValue(v)(thunk)
+    }
   }
 
   def requestPath: String
