@@ -47,7 +47,7 @@ import ScalatraKernel._
  */
 trait ScalatraKernel extends Handler with CoreDsl with Initializable
 {
-  protected lazy val routes: RouteRegistry = new RouteRegistry
+  lazy val routes: RouteRegistry = new RouteRegistry
 
   protected val defaultCharacterEncoding = "UTF-8"
   protected val _response   = new DynamicVariable[HttpServletResponse](null)
@@ -91,46 +91,33 @@ trait ScalatraKernel extends Handler with CoreDsl with Initializable
     _request.withValue(request) {
       _response.withValue(response) {
         _multiParams.withValue(Map() ++ realMultiParams) {
-          val result = try {
-            runFilters(routes.beforeFilters)
-            val actionResult = runRoutes(routes(request.method)).headOption
-            actionResult orElse matchOtherMethods() getOrElse doNotFound()
-          }
-          catch {
-            case e: HaltException => renderHaltException(e)
-            case e => errorHandler(e)
-          }
-          finally {
-            runFilters(routes.afterFilters)
-          }
-          renderResponse(result)
+          renderResponse(routeExecutor.execute)
         }
       }
     }
   }
 
-  protected def runFilters(filters: Traversable[Route]) =
-    for {
-      route <- filters
-      matchedRoute <- route()
-    } invoke(matchedRoute)
-
-  protected def runRoutes(routes: Traversable[Route]) =
-    for {
-      route <- routes.toStream // toStream makes it lazy so we stop after match
-      matchedRoute <- route()
-      actionResult <- invoke(matchedRoute)
-    } yield actionResult
-
-  protected def invoke(matchedRoute: MatchedRoute) =
-    _multiParams.withValue(multiParams ++ matchedRoute.multiParams) {
-      try {
-        Some(matchedRoute.action())
-      }
-      catch {
-        case e: PassException => None
-      }
+  protected def renderHaltException(e: ScalatraKernel#HaltException) {
+    e match {
+      case HaltException(Some(status), Some(reason), _, _) => response.setStatus(status, reason)
+      case HaltException(Some(status), None, _, _) => response.setStatus(status)
+      case HaltException(None, _, _, _) => // leave status line alone
     }
+    e.headers foreach { case(name, value) => response.addHeader(name, value) }
+    renderResponse(e.body)
+  }
+
+  protected def routeExecutor: RouteExecutor = {
+    new RouteExecutor(
+          this,
+          doMethodNotAllowed,
+          errorHandler,
+          doNotFound,
+          renderResponse _,
+          renderHaltException _) {
+      protected def withMultiParams[S](v: Map[String, Seq[String]])(thunk: S) = _multiParams.withValue(v)(thunk)
+    }
+  }
 
   def requestPath: String
 
@@ -154,11 +141,7 @@ trait ScalatraKernel extends Handler with CoreDsl with Initializable
     response.setHeader("Allow", allow.mkString(", "))
   }
   def methodNotAllowed(f: Set[HttpMethod] => Any) = doMethodNotAllowed = f
-
-  private def matchOtherMethods(): Option[Any] = {
-    val allow = routes.matchingMethodsExcept(request.method)
-    if (allow.isEmpty) None else Some(doMethodNotAllowed(allow))
-  }
+//
 
   protected var errorHandler: ErrorHandler = { case t => throw t }
   def error(handler: ErrorHandler) = errorHandler = handler orElse errorHandler
@@ -213,30 +196,20 @@ trait ScalatraKernel extends Handler with CoreDsl with Initializable
   implicit def request = _request value
   implicit def response = _response value
 
-  def halt(status: JInteger = null,
-           body: Any = (),
+  def halt[T: Manifest](status: JInteger = null,
+           body: T = (),
            headers: Map[String, String] = Map.empty,
            reason: String = null): Nothing = {
     val statusOpt = if (status == null) None else Some(status.intValue)
     throw new HaltException(statusOpt, Some(reason), headers, body)
   }
 
-  protected case class HaltException(
+  protected[scalatra] case class HaltException(
       status: Option[Int],
       reason: Option[String],
       headers: Map[String, String],
       body: Any)
    extends RuntimeException
-
-  private def renderHaltException(e: HaltException) {
-    e match {
-      case HaltException(Some(status), Some(reason), _, _) => response.setStatus(status, reason)
-      case HaltException(Some(status), None, _, _) => response.setStatus(status)
-      case HaltException(None, _, _, _) => // leave status line alone
-    }
-    e.headers foreach { case(name, value) => response.addHeader(name, value) }
-    renderResponse(e.body)
-  }
 
   def pass() = throw new PassException
   protected[scalatra] class PassException extends RuntimeException
