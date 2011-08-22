@@ -2,16 +2,18 @@ package org.scalatra
 
 import javax.servlet.http.{HttpSession, HttpServletRequest}
 import javax.servlet.ServletContext
+import scala.util.DynamicVariable
+import util.MultiMap
 
-abstract class RouteExecutor(
+class RouteExecutor(
                   app: ScalatraKernel,
                   methodNotAllowedHandler: Set[HttpMethod] => Any,
                   errorHandler: ErrorHandler,
                   notFoundHandler: ScalatraKernel.Action,
                   renderResponseBody: Any => Unit,
-                  renderHaltException: ScalatraKernel#HaltException => Unit) {
+                  renderHaltException: ScalatraKernel#HaltException => Unit,
+                  multiParams: DynamicVariable[MultiMap]) {
 
-  protected def withMultiParams[S](v: Map[String, Seq[String]])(thunk: S) : S
   protected implicit def requestWrapper(r: HttpServletRequest) = RichRequest(r)
   protected implicit def sessionWrapper(s: HttpSession) = new RichSession(s)
   protected implicit def servletContextWrapper(sc: ServletContext) = new RichServletContext(sc)
@@ -53,7 +55,7 @@ abstract class RouteExecutor(
     } yield actionResult
 
   protected def invoke(matchedRoute: MatchedRoute) =
-    withMultiParams(app.multiParams ++ matchedRoute.multiParams) {
+    multiParams.withValue(app.multiParams ++ matchedRoute.multiParams) {
       try {
         Some(matchedRoute.action())
       }
