@@ -155,8 +155,7 @@ object ScalatraBuild extends Build {
         case x => "specs_"+x
       }
       val libVersion = scalaVersion match {
-        case "2.9.0-1" => "1.6.9-SNAPSHOT"
-        case "2.9.1" => "1.6.9-SNAPSHOT"
+        case "2.9.1" => "1.6.9"
         case _ => "1.6.8"
       }
       "org.scala-tools.testing" % libArtifactId % libVersion
@@ -167,12 +166,9 @@ object ScalatraBuild extends Build {
         case "2.8.2.RC1" => "specs2_2.8.1"
         case x => "specs2_"+x
       }
-      val libVersion = scalaVersion match {
-        case x if x startsWith "2.8." => "1.5"
-        case "2.9.0" => "1.5" // https://github.com/etorreborre/specs2/issues/33
-        case _ => "1.6-SNAPSHOT"
-      }
-      "org.specs2" % libArtifactId % libVersion
+      // Don't ever use 1.6 with 2.9.0:
+      // https://github.com/etorreborre/specs2/issues/33
+      "org.specs2" % libArtifactId % "1.5"
     }
 
     val servletApi = "javax.servlet" % "servlet-api" % "2.5" % "provided"
