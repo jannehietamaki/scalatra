@@ -9,7 +9,7 @@ object ScalatraBuild extends Build {
 
   val scalatraSettings = Defaults.defaultSettings ++ Seq(
     organization := "org.scalatra",
-    version := "2.0.0-SNAPSHOT",
+    version := "2.1.0-SNAPSHOT",
     crossScalaVersions := Seq("2.8.1", "2.8.2.RC1"),
     scalaVersion <<= (crossScalaVersions) { versions => versions.head },
     scalacOptions ++= Seq("-unchecked", "-deprecation"),
@@ -110,7 +110,7 @@ object ScalatraBuild extends Build {
 
     val commonsIo = "commons-io" % "commons-io" % "2.0.1"
 
-    private def jettyDep(name: String) = "org.eclipse.jetty" % name % "7.4.5.v20110725"
+    private def jettyDep(name: String) = "org.eclipse.jetty" % name % "8.0.0.v20110901"
     val testJettyServlet = jettyDep("test-jetty-servlet")
     val jettyWebsocket = jettyDep("jetty-websocket")
     val jettyWebapp = jettyDep("jetty-webapp")
@@ -118,13 +118,12 @@ object ScalatraBuild extends Build {
     val junit = "junit" % "junit" % "4.8.2"
 
     def liftJson(scalaVersion: String) = {
-      val libArtifactId = scalaVersion match {
-        case "2.8.2.RC1" => "lift-json_2.8.1"
-        case "2.9.1.RC4" => "lift-json_2.9.0"
-        case "2.9.1" => "lift-json_2.9.0"
-        case x => "lift-json_"+x
+      val (libArtifactId, libArtifactVersion) = scalaVersion match {
+        case "2.8.2.RC1" => ("lift-json_2.8.1", "2.4-M3")
+        case "2.9.1" => ("lift-json_2.9.1", "2.4-SNAPSHOT")
+        case x => ("lift-json_"+x, "2.4-M3")
       }
-      "net.liftweb" % libArtifactId % "2.4-M3"
+      "net.liftweb" % libArtifactId % libArtifactVersion
     }
 
     val mockitoAll = "org.mockito" % "mockito-all" % "1.8.5"
@@ -171,11 +170,13 @@ object ScalatraBuild extends Build {
       "org.specs2" % libArtifactId % "1.5"
     }
 
-    val servletApi = "javax.servlet" % "servlet-api" % "2.5" % "provided"
+    val servletApi = "javax.servlet" % "javax.servlet-api" % "3.0.1" % "provided"
 
-    def socketioCore(version: String) = "org.scalatra.socketio-java" % "socketio-core" % version
+    def socketioCore(version: String) = "org.scalatra.socketio-java" % "socketio-core" % "2.0.0.RC1"
 
     val testng = "org.testng" % "testng" % "6.1.1" % "optional"
+
+    val atmosphere = "org.atmosphere" % "atmosphere-runtime" % "0.7.2"
   }
   import Dependencies._
 
@@ -295,7 +296,7 @@ object ScalatraBuild extends Build {
     .settings(webSettings :_*)
     .settings(
       resolvers += sonatypeSnapshots,
-      libraryDependencies ++= Seq(servletApi, jettyWebapp % "jetty"),
+      libraryDependencies ++= Seq(servletApi, jettyWebapp % "jetty", atmosphere),
       description := "Scalatra example project",
       publish := {},
       publishLocal := {})
